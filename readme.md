@@ -58,7 +58,16 @@ helm install fluentd-release -f values.yaml bitnami/fluentd
 # Read more about the installation in the Fluentd packaged by Bitnami Chart Github repository
 ```
 
-# App deployment:
+# App:
+
+## Note:
+The app uses following output template for log.
+```
+[{Timestamp:HH:mm:ss} {Level:u3}] {Application} | {Message} | RequestId={RequestId} | {Exception}{NewLine}
+```
+For the fluentd detect_exception plugin to work, iIt is important that there is no line break before exception. The template must end with a line break, since serilog console logger does not add newline between logs.
+
+## Deployment:
 
 Steps:
 1. Build, tag and push sampleWebAPI docker image to the docker registry service:
