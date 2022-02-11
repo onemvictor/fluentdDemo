@@ -1,0 +1,56 @@
+## For using with the chart https://github.com/bitnami/charts/tree/master/bitnami/fluentd
+image:
+  tag: 1.13.3-debian-10-r30
+aggregator:
+  configMapFiles:
+    fluentd.conf: |
+      # Ignore fluentd own events
+      <match fluent.**>
+        @type null
+      </match>
+
+      @include fluentd-inputs.conf
+      @include fluentd-output.conf
+      {{- if .Values.metrics.enabled }}
+      @include metrics.conf
+      {{- end }}
+    fluentd-inputs.conf: |
+      # TCP input to receive logs from
+      {{- if .Values.aggregator.port }}
+      <source>
+        @type forward
+        bind 0.0.0.0
+        port {{ .Values.aggregator.port }}
+        {{- if .Values.tls.enabled }}
+        <transport tls>
+          ca_path /opt/bitnami/fluentd/certs/in_forward/ca.crt
+          cert_path /opt/bitnami/fluentd/certs/in_forward/tls.crt
+          private_key_path /opt/bitnami/fluentd/certs/in_forward/tls.key
+          client_cert_auth true
+        </transport>
+        {{- end }}
+      </source>
+      {{- end }}
+
+      # HTTP input for the liveness and readiness probes
+      <source>
+        @type http
+        bind 0.0.0.0
+        port 9880
+      </source>
+    fluentd-output.conf: |
+      # Throw the healthcheck to the standard output
+      <match fluentd.healthcheck>
+        @type stdout
+      </match>
+
+      # Send the logs to elasticsearch service running on the host
+      <match **>
+        @type elasticsearch
+        host host.minikube.internal
+        port 9200
+        # scheme https
+        # user admin
+        # password admin
+        logstash_format true
+      </match>

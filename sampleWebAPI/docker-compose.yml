@@ -1,0 +1,7 @@
+version: "3.2"
+
+services:
+  samplewebapi:
+    image: samplewebapi:latest
+    ports: 
+      - 8844:8080
