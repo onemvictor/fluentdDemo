@@ -1,43 +1,50 @@
 ## For using with the chart https://github.com/bitnami/charts/tree/master/bitnami/fluentd
 image:
   tag: 1.13.3-debian-10-r30
-aggregator:
+
+openSearch:
+  host: host.minikube.internal
+  port: 9200
+
+forwarder:
   configMapFiles:
-    fluentd.conf: |
-      # Ignore fluentd own events
-      <match fluent.**>
-        @type null
-      </match>
-
-      @include fluentd-inputs.conf
-      @include fluentd-output.conf
-      {{- if .Values.metrics.enabled }}
-      @include metrics.conf
-      {{- end }}
     fluentd-inputs.conf: |
-      # TCP input to receive logs from
-      {{- if .Values.aggregator.port }}
-      <source>
-        @type forward
-        bind 0.0.0.0
-        port {{ .Values.aggregator.port }}
-        {{- if .Values.tls.enabled }}
-        <transport tls>
-          ca_path /opt/bitnami/fluentd/certs/in_forward/ca.crt
-          cert_path /opt/bitnami/fluentd/certs/in_forward/tls.crt
-          private_key_path /opt/bitnami/fluentd/certs/in_forward/tls.key
-          client_cert_auth true
-        </transport>
-        {{- end }}
-      </source>
-      {{- end }}
-
       # HTTP input for the liveness and readiness probes
       <source>
         @type http
-        bind 0.0.0.0
         port 9880
       </source>
+      # Get the logs from the containers running in the node
+      <source>
+        @type tail
+        path /var/log/containers/*.log
+        # exclude Fluentd logs
+        exclude_path /var/log/containers/*fluentd*.log
+        pos_file /opt/bitnami/fluentd/logs/buffers/fluentd-docker.pos
+        tag kubernetes.*
+        read_from_head true
+        <parse>
+          @type json
+          time_key time
+          time_format %Y-%m-%dT%H:%M:%S.%NZ
+        </parse>
+      </source>
+      # enrich with kubernetes metadata
+      <filter kubernetes.**>
+        @type kubernetes_metadata
+      </filter>
+      # detect exception and combine split logs 
+      <match kubernetes.**>
+        @type detect_exceptions
+        remove_tag_prefix kubernetes
+        message log
+        languages csharp
+        force_line_breaks true
+        multiline_flush_interval 0.1
+        stream real
+      </match>      
+aggregator:
+  configMapFiles:
     fluentd-output.conf: |
       # Throw the healthcheck to the standard output
       <match fluentd.healthcheck>
@@ -47,10 +54,7 @@ aggregator:
       # Send the logs to elasticsearch service running on the host
       <match **>
         @type elasticsearch
-        host host.minikube.internal
-        port 9200
-        # scheme https
-        # user admin
-        # password admin
+        host {{ .Values.openSearch.host }}
+        port {{ .Values.openSearch.port }}
         logstash_format true
       </match>

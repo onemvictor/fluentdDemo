@@ -44,11 +44,10 @@ ingress:
   enabled: true
   className: "nginx"
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$1
     # kubernetes.io/ingress.class: nginx
     # kubernetes.io/tls-acme: "true"
   hosts:
-    - host: samplewebapi.local
+    - host: samplewebapi.minik8s
       paths:
         - path: /
           pathType: ImplementationSpecific

@@ -19,13 +19,31 @@ The opensearch host runs at http://localhost:9200 and opensearch dashboard can b
 ## Cluser setup
 This demo uses [minikube](https://minikube.sigs.k8s.io/docs/start/).
 
-Add insecure local docker registry service to minikube config.
-```bash
-minikube config set insecure-registry minikube.host.internal:5000
-```
 Run a local cluster.
 ```bash
-minikube start
+minikube start --insecure-registry=host.minikube.internal:5000 --driver=docker
+```
+
+Enable ingress addon.
+
+```bash
+minikube addons enable ingress
+```
+
+### ⚠️ Ingress-dns addon is not working in windows.
+**Instead, use `minikube tunnel` and add entry for the ingress host in the windows hosts file pointing to 127.0.0.1.** 
+
+**The section below is kept for future investigation.**
+
+Enable [ingress dns](https://minikube.sigs.k8s.io/docs/handbook/addons/ingress-dns/) addon. Ingress dns addon will help with nslookup from host system without modification of hosts file.
+```bash
+minikube addons enable ingress-dns
+```
+
+Add `minikube ip` as a dns server for resolving `.minik8s` domains. We will use this as the `top level domain` for all ingress hosts requiring external access.
+```powershell
+$namespace='.minik8s'
+Get-DnsClientNrptRule | Where-Object {$_.Namespace -eq $namespace} | Remove-DnsClientNrptRule -Force; Add-DnsClientNrptRule -Namespace $namespace -NameServers "$(minikube ip)"
 ```
 
 # Fluentd deployment:
@@ -55,3 +73,12 @@ docker push localhost:5000/samplewebapi:latest
 ```bash
 helm install samplewebapi ./tools/chart/samplewebapi
 ```
+
+# Viewing logs in OpenSearch Dashboard
+
+Browse to http://localhost:5601 to open the opensearch dashboard. Create an index with pattern `logstash-*`. 
+
+There are multiple ways to browse and filter logs.
+
+* You can view logs in the `discover` section of opensearch dashboard. You can use [DQL](https://opensearch.org/docs/latest/dashboards/dql/) to filter logs. 
+* You can open the `Query Workbench` section and use [Opensearch SQL](https://opensearch.org/docs/latest/search-plugins/sql/index/). 
